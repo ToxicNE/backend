@@ -1,17 +1,19 @@
 const express = require('express');
-const router = express.Router();
-const pool = require('../db');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const pool = require('../db'); // путь к вашему файлу с подключением к базе
 
-//TODO: move to .env
-const JWT_SECRET = 'j/00ghLx='; 
+const router = express.Router();
+const SECRET_KEY = 'j/00ghLx='; // замени на свой секретный ключ
 
+// Регистрация
 router.post('/register', async (req, res) => {
   const { username, password, name } = req.body;
+
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
+
   try {
     const hashed = await bcrypt.hash(password, 10);
     const result = await pool.query(
@@ -29,21 +31,54 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Вход (логин)
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
+
   try {
-    const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (userResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
-    const user = userResult.rows[0];
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+    const result = await pool.query(
+      'SELECT * FROM users WHERE username = $1',
+      [username]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
-    res.json({ token, id: user.id, username: user.username, name: user.name });
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      SECRET_KEY,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ token, id: user.id, name: user.name, username: user.username });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Поиск пользователей по username
+router.get('/search', async (req, res) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return res.status(400).json({ error: 'Query parameter "username" required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id, username, name FROM users WHERE username ILIKE $1',
+      [`%${username}%`]
+    );
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -12,6 +12,7 @@ const chatsRouter = require('./routes/chats');
 
 app.use('/auth', authRouter);
 app.use('/chats', chatsRouter);
+app.use('/uploads', express.static('uploads'));
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);

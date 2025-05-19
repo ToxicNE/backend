@@ -1,21 +1,19 @@
 const jwt = require('jsonwebtoken');
 
-const secret = 'j/00ghLx='; // Поменяй на свой секрет!
+const secret = 'j/00ghLx=';  // Тот же, что используешь в auth.js
 
-function authMiddleware(req, res, next) {
+const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token' });
+  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
 
   const token = authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Invalid token format' });
-
   try {
-    const user = jwt.verify(token, secret);
-    req.user = user;
+    const decoded = jwt.verify(token, secret);
+    req.user = decoded; // Данные пользователя из токена
     next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch (err) {
+    res.status(403).json({ error: 'Invalid token' });
   }
-}
+};
 
-module.exports = { authMiddleware, secret };
+module.exports = verifyToken;
